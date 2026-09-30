@@ -9,14 +9,19 @@
 <style>
   :root{ --gold:#d9b26b; --ink:#3a2b22; }
   html,body{height:100%;margin:0;font-family:'Georgia','Times New Roman',serif;
-    background:radial-gradient(ellipse at center, #2b4a5e 0%, #0f1e2b 100%);
+    background:#1a140f;
     display:flex;align-items:center;justify-content:center;overflow:hidden;}
+  #bgMosaic{position:fixed;inset:0;z-index:-2;display:grid;
+    grid-template-columns:repeat(7,1fr);grid-auto-rows:1fr;gap:2px;overflow:hidden;}
+  #bgMosaic img{width:100%;height:100%;object-fit:cover;filter:grayscale(35%) brightness(.9);}
+  #bgOverlay{position:fixed;inset:0;z-index:-1;
+    background:radial-gradient(ellipse at center, rgba(20,14,10,.88) 0%, rgba(10,7,5,.96) 100%);}
   #stage{position:relative;width:min(94vw,1000px);height:min(88vh,760px);perspective:2000px;}
   .page{position:absolute;top:0;left:0;width:100%;height:100%;
     background:#fdf6e9;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.5);
     display:flex;flex-direction:column;align-items:center;justify-content:center;
     padding:20px;box-sizing:border-box;backface-visibility:hidden;overflow:hidden;
-    transform-origin:left center;transition:transform 1s cubic-bezier(.4,.2,.2,1), box-shadow 1s;
+    transform-origin:left center;transition:opacity 1.4s ease, box-shadow 1.4s ease;
     text-align:center;}
   .page img{max-width:100%;max-height:78%;object-fit:contain;border-radius:6px;
     box-shadow:0 4px 14px rgba(0,0,0,.25);}
@@ -24,13 +29,18 @@
   .page h2{color:#7a6a5a;font-weight:normal;font-style:italic;margin:0 0 10px;}
   .page p.caption{color:var(--ink);margin-top:10px;font-size:clamp(13px,2vw,18px);font-style:italic;flex-shrink:0;}
   .page .num{position:absolute;bottom:8px;right:14px;font-size:12px;color:#a9987f;}
+  .page.closing-page img{max-height:46%;}
+  .page.closing-page .closing-body{color:var(--ink);font-size:clamp(15px,2.2vw,20px);
+    font-style:italic;max-width:520px;margin-top:14px;line-height:1.6;}
+  .page.closing-page .closing-sign{color:#7a6a5a;font-size:clamp(20px,3vw,28px);
+    margin-top:16px;font-family:'Brush Script MT',cursive;}
   .page.collage-page{justify-content:flex-start;}
   .page.collage-page .caption{margin-top:8px;flex-shrink:0;}
   .collage-grid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:10px;
     width:100%;flex-shrink:0;overflow:hidden;}
   .collage-grid img{width:100%;height:100%;object-fit:cover;border-radius:6px;
     box-shadow:0 4px 14px rgba(0,0,0,.25);}
-  .flipped{transform:rotateY(-180deg);box-shadow:none;}
+  .flipped{box-shadow:none;opacity:0;}
   .page.note-page{display:block;padding:0;background-size:cover;background-position:center;text-align:left;}
   .note-overlay{position:absolute;inset:0;
     background:linear-gradient(105deg, rgba(6,5,4,.97) 0%, rgba(6,5,4,.93) 45%, rgba(6,5,4,.55) 68%, rgba(6,5,4,.1) 85%);}
@@ -47,24 +57,36 @@
     .note-body p{font-size:14px;line-height:1.55;margin-bottom:11px;} .note-sign{font-size:22px;}
   }
   .note-page .num{color:#e9dcc3;}
-  #controls{position:fixed;bottom:22px;left:0;right:0;display:flex;justify-content:center;gap:16px;z-index:50;}
+  .page.note-page{transition:opacity 2.5s ease, box-shadow 1.4s ease;}
+  .start-hint{position:absolute;bottom:20px;left:0;right:0;z-index:2;text-align:center;
+    color:#f0e2c3;font-size:22px;font-weight:bold;letter-spacing:1.5px;cursor:pointer;
+    text-shadow:0 2px 8px rgba(0,0,0,.7);animation:pulseHint 1.8s ease-in-out infinite;}
+  @media (min-width:600px){ .start-hint{font-size:28px;} }
+  @keyframes pulseHint{0%,100%{opacity:.6;transform:scale(1);}50%{opacity:1;transform:scale(1.06);}}
+  #controls{position:fixed;bottom:22px;left:0;right:0;display:flex;justify-content:center;gap:16px;z-index:50;
+    opacity:0;pointer-events:none;transition:opacity .8s ease;}
+  #controls.visible{opacity:1;pointer-events:auto;}
   button{background:var(--gold);border:none;color:#2b2016;padding:10px 20px;border-radius:30px;
     font-size:16px;cursor:pointer;font-family:inherit;box-shadow:0 3px 10px rgba(0,0,0,.4);}
   button:hover{filter:brightness(1.1);}
   button:disabled{opacity:.4;cursor:default;}
-  #pageCount{color:#e9dcc3;align-self:center;font-size:14px;}
+  .nav-btn{display:none;}
+  .nav-btn.show{display:inline-block;}
 </style>
 </head>
 <body>
+
+<div id="bgMosaic"></div>
+<div id="bgOverlay"></div>
 
 <audio id="bgMusic" src="song.mp4" preload="auto"></audio>
 
 <div id="stage"></div>
 
 <div id="controls">
-  <button id="prevBtn">&larr; Prev</button>
-  <span id="pageCount"></span>
-  <button id="nextBtn">Next &rarr;</button>
+  <button id="prevBtn" class="nav-btn">&larr; Prev</button>
+  <button id="pauseBtn">&#10073;&#10073; Pause</button>
+  <button id="nextBtn" class="nav-btn">Next &rarr;</button>
 </div>
 
 <script>
@@ -82,10 +104,10 @@ const pages = [
     ],
     sign:"DWC ♡"},
   {type:'cover', img:G+"SoulMate.png", title:"Soulmates Across the Sea", sub:"A David & Charlotte Story"},
-  {img:G+"OneDaySheWillBeMine.png", caption:"Before we were anything, I already knew: one day, she'd be mine."},
-  {img:G+"GoofyDroolingOverHer.png", caption:"She walks in and I forget what I was saying."},
-  {img:G+"Photobooth.png", caption:"Just us, being completely ridiculous together."},
-  {img:G+"Dear Davey.png", caption:"The letter that made it all feel real, for both of us."},
+  {img:G+"OneDaySheWillBeMine.png", caption:"Before we were anything, my heart knew it was you it wanted."},
+  {img:G+"GoofyDroolingOverHer.png", caption:"One look at her and I freeze — brain gone, jaw on the floor."},
+  {img:G+"Photobooth.png", caption:"My person, my chaos, my calm — every lifetime, still you."},
+  {img:G+"Dear Davey.png", caption:"The note I will never forget."},
   {img:G+"FavoritePicture.png", caption:"My favorite picture, of my favorite person."},
   {img:G+"FromHer.png", caption:"Turns out she'd been falling just as hard, the whole time."},
   {img:G+"HerConfessingFirst.png", caption:"Then one day, before I could say it myself, she said it first."},
@@ -102,18 +124,39 @@ const pages = [
   {img:N+"TicTacToe.png", caption:"A game I made up, just as an excuse to get her flowers."},
   {img:G+"OurToDoList.png", caption:"Our list for the future. Item one: stay soulmates."},
   {img:G+"HopefullyOurFuture.png", caption:"Hopefully, this is us someday."},
-  {img:G+"NoteBookSketch.png", caption:"To be continued..."}
+  {img:G+"NoteBookSketch.png", caption:"To be continued..."},
+  {type:'closing', img:G+"SoulMate.png",
+    title:"Charlotte Poppy",
+    body:"Loving you makes me the most complete I've ever felt. You deserve the entire world, and I'm going to spend every day trying to give it to you. I love you, always."}
 ];
 
 const stage = document.getElementById('stage');
 let current = 0;
+
+// Faint background mosaic built from every photo used in the book
+const allImages = [];
+pages.forEach(p => {
+  if(p.img) allImages.push(p.img);
+  if(p.imgs) allImages.push(...p.imgs);
+});
+const mosaic = document.getElementById('bgMosaic');
+const MOSAIC_CELLS = 42;
+for(let i = 0; i < MOSAIC_CELLS; i++){
+  const img = document.createElement('img');
+  img.src = allImages[i % allImages.length];
+  img.alt = '';
+  mosaic.appendChild(img);
+}
 
 pages.forEach((p, i) => {
   const div = document.createElement('div');
   div.className = 'page';
   div.style.zIndex = pages.length - i;
   if(p.type === 'cover'){
-    div.innerHTML = `<h1>${p.title}</h1><h2>${p.sub}</h2><img src="${p.img}" alt="cover"><p class="caption">Turn the page...</p>`;
+    div.innerHTML = `<h1>${p.title}</h1><h2>${p.sub}</h2><img src="${p.img}" alt="cover">`;
+  } else if(p.type === 'closing'){
+    div.classList.add('closing-page');
+    div.innerHTML = `<img src="${p.img}" alt="closing"><h1>${p.title}</h1><p class="closing-body">${p.body}</p><p class="closing-sign">Your Cheeky Chops</p>`;
   } else if(p.type === 'note'){
     div.classList.add('note-page');
     div.style.backgroundImage = `url('${p.img}')`;
@@ -127,7 +170,8 @@ pages.forEach((p, i) => {
         <div class="note-body">${bodyHtml}</div>
         <div class="note-sign">${p.sign}</div>
       </div>
-      <span class="num">${i+1} / ${pages.length}</span>`;
+      <span class="num">${i+1} / ${pages.length}</span>
+      <div class="start-hint">&#9656; Play me</div>`;
   } else if(p.type === 'collage'){
     div.classList.add('collage-page');
     const imgsHtml = p.imgs.map((src, idx) => `<img src="${src}" alt="memory ${i}-${idx}">`).join('');
@@ -162,33 +206,136 @@ window.addEventListener('resize', sizeCollagePages);
 sizeCollagePages();
 
 function update(){
+  // z-index is fixed at creation time (pages.length - i), so pages naturally
+  // stack in order. Toggling opacity via .flipped on already-passed pages is
+  // enough to reveal the current page underneath - a clean crossfade with no
+  // z-index juggling needed.
   pageEls.forEach((el, i) => {
     el.classList.toggle('flipped', i < current);
-    el.style.zIndex = i < current ? i : pages.length - i;
   });
-  document.getElementById('pageCount').textContent = `${current} / ${pages.length}`;
   document.getElementById('prevBtn').disabled = current === 0;
   document.getElementById('nextBtn').disabled = current === pages.length;
 }
 
 const bgMusic = document.getElementById('bgMusic');
-bgMusic.volume = 0.25; // 0 (silent) to 1 (full volume)
+const MUSIC_VOLUME = 0.25; // 0 (silent) to 1 (full volume)
+bgMusic.volume = MUSIC_VOLUME;
 
-document.getElementById('nextBtn').onclick = () => {
-  if(current < pages.length){
-    if(current === 0){
-      bgMusic.currentTime = 0;
-      bgMusic.play();
+function fadeInMusic(duration = 2500){
+  bgMusic.currentTime = 0;
+  bgMusic.volume = 0;
+  bgMusic.play();
+  const steps = 30;
+  const stepTime = duration / steps;
+  let step = 0;
+  const fadeTimer = setInterval(() => {
+    step++;
+    bgMusic.volume = Math.min(MUSIC_VOLUME, (MUSIC_VOLUME / steps) * step);
+    if(step >= steps) clearInterval(fadeTimer);
+  }, stepTime);
+}
+
+function fadeOutMusic(duration = 4000){
+  const startVolume = bgMusic.volume;
+  const steps = 30;
+  const stepTime = duration / steps;
+  let step = 0;
+  const fadeTimer = setInterval(() => {
+    step++;
+    bgMusic.volume = Math.max(0, startVolume * (1 - step / steps));
+    if(step >= steps){
+      clearInterval(fadeTimer);
+      bgMusic.pause();
+    }
+  }, stepTime);
+}
+
+let autoTimer = null;
+const AUTO_ADVANCE_MS = 7000; // default seconds per page during auto-play
+const COVER_INDEX = pages.findIndex(p => p.type === 'cover');
+const COVER_ADVANCE_MS = 6000; // time to linger on the cover page
+
+function stopAutoAdvance(){
+  clearTimeout(autoTimer);
+  autoTimer = null;
+}
+
+function scheduleAuto(){
+  const delay = current === COVER_INDEX ? COVER_ADVANCE_MS : AUTO_ADVANCE_MS;
+  autoTimer = setTimeout(() => {
+    if(current >= pages.length - 1){
+      // already resting on the last page - end the story here, gently
+      stopAutoAdvance();
+      fadeOutMusic();
+      pauseBtn.innerHTML = '&#9654; Play';
+      showManualNav(true);
+      return;
     }
     current++;
     update();
+    scheduleAuto();
+  }, delay);
+}
+
+function startAutoAdvance(){
+  stopAutoAdvance();
+  scheduleAuto();
+}
+
+const pauseBtn = document.getElementById('pauseBtn');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+
+function showManualNav(show){
+  prevBtn.classList.toggle('show', show);
+  nextBtn.classList.toggle('show', show);
+}
+
+function pauseStory(){
+  stopAutoAdvance();
+  bgMusic.pause();
+  pauseBtn.innerHTML = '&#9654; Play';
+  showManualNav(true);
+}
+
+function resumeStory(){
+  showManualNav(false);
+  pauseBtn.innerHTML = '&#10073;&#10073; Pause';
+  if(current < pages.length){
+    bgMusic.play();
+    startAutoAdvance();
+  }
+}
+
+pauseBtn.onclick = () => {
+  if(autoTimer){
+    pauseStory();
+  } else {
+    resumeStory();
   }
 };
-document.getElementById('prevBtn').onclick = () => { if(current > 0){ current--; update(); } };
+
+nextBtn.onclick = () => {
+  if(current < pages.length){ current++; update(); }
+};
+prevBtn.onclick = () => {
+  if(current > 0){ current--; update(); }
+};
 document.addEventListener('keydown', e => {
-  if(e.key === 'ArrowRight') document.getElementById('nextBtn').click();
-  if(e.key === 'ArrowLeft') document.getElementById('prevBtn').click();
+  if(!prevBtn.classList.contains('show')) return;
+  if(e.key === 'ArrowRight') nextBtn.click();
+  if(e.key === 'ArrowLeft') prevBtn.click();
 });
+
+stage.addEventListener('click', () => {
+  document.getElementById('controls').classList.add('visible');
+  fadeInMusic(); // music starts immediately
+  setTimeout(() => { // page fade waits 1.5s before beginning
+    current++;
+    update();
+    startAutoAdvance();
+  }, 1500);
+}, { once: true });
 
 update();
 </script>
