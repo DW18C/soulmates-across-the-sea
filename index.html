@@ -52,17 +52,12 @@
     font-size:16px;cursor:pointer;font-family:inherit;box-shadow:0 3px 10px rgba(0,0,0,.4);}
   button:hover{filter:brightness(1.1);}
   button:disabled{opacity:.4;cursor:default;}
-  #music{position:fixed;top:18px;right:18px;z-index:50;width:160px;max-width:calc(100vw - 36px);}
-  #music iframe{width:100%;height:90px;border-radius:12px;border:none;}
   #pageCount{color:#e9dcc3;align-self:center;font-size:14px;}
 </style>
 </head>
 <body>
 
-<div id="music">
-  <div id="yt-player"></div>
-</div>
-<script src="https://www.youtube.com/iframe_api" async></script>
+<audio id="bgMusic" src="song.mp4" preload="auto"></audio>
 
 <div id="stage"></div>
 
@@ -176,25 +171,14 @@ function update(){
   document.getElementById('nextBtn').disabled = current === pages.length;
 }
 
-let ytPlayer = null;
-
-function onYouTubeIframeAPIReady(){
-  ytPlayer = new YT.Player('yt-player', {
-    width: '160',
-    height: '90',
-    videoId: 'd-wOYjvLWwU',
-    playerVars: { 'start': 0, 'playsinline': 1 },
-    events: {
-      'onReady': (e) => { e.target.setVolume(25); } // 0-100
-    }
-  });
-}
+const bgMusic = document.getElementById('bgMusic');
+bgMusic.volume = 0.25; // 0 (silent) to 1 (full volume)
 
 document.getElementById('nextBtn').onclick = () => {
   if(current < pages.length){
-    if(current === 0 && ytPlayer){
-      ytPlayer.seekTo(0, true);
-      ytPlayer.playVideo();
+    if(current === 0){
+      bgMusic.currentTime = 0;
+      bgMusic.play();
     }
     current++;
     update();
